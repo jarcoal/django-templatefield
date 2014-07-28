@@ -21,22 +21,22 @@ class TemplateField(six.with_metaclass(models.SubfieldBase, models.TextField)):
     A field that stores a Django template.
     """
 
-    _error_messages = {
+    _errors = {
         'invalid': _('template contains invalid syntax.'),
-        'tag_not_allowed': _('the "%s" tag is not allowed.'),
+        'not_allowed': _('template tag not allowed: %s'),
     }
 
-    def __init__(self, unsafe_tags=False, **kwargs):
-        self.unsafe_tags = unsafe_tags
+    def __init__(self, allow_unsafe_tags=False, **kwargs):
+        self.allow_unsafe_tags = allow_unsafe_tags
         super(TemplateField, self).__init__(**kwargs)
 
     def validate(self, value, model_instance):
         super(TemplateField, self).validate(value, model_instance)
 
-        try:
-            self.get_prep_value(value)
-        except:
-            raise ValidationError(self._error_messages['invalid'])
+        if not self.allow_unsafe_tags:
+            for node in value.nodelist:
+                if isinstance(node, UNSAFE_TAGS):
+                    raise ValidationError(self._errors['not_allowed'] % node)
 
     def get_default(self):
         """defaults can be specified as a string or a django template obj"""
@@ -62,13 +62,19 @@ class TemplateField(six.with_metaclass(models.SubfieldBase, models.TextField)):
             try:
                 return get_template_from_string(value)
             except TemplateSyntaxError:
-                raise ValidationError(self._error_messages())
+                raise ValidationError(self._errors['invalid'])
 
         return value
 
-    def get_prep_value(self, template):
+    def get_prep_value(self, value):
         """prepare template for the database"""
-        return template.origin.source
+
+        if value is None:
+            if not self.null and self.blank:
+                return ""
+            return None
+
+        return value.origin.source
 
     def value_to_string(self, value):
-        return self.get_prep_value(value)
+        return self.get_prep_value(self._get_val_from_obj(value))
