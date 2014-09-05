@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="django-templatefield",
-    version="0.0.1",
+    version="0.0.2",
     description="Django model field for saving/retrieving templates for rendering.",
     long_description=open("README.md").read(),
     keywords="django, templates",
